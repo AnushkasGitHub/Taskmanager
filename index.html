@@ -10,7 +10,6 @@
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js'></script>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
             --color-granite-black: #0a0a0b;
@@ -166,16 +165,7 @@
         .detail-item strong { color: var(--color-text-tertiary); font-weight: 500; margin-right: 0.5rem; }
         .tags-container { display: flex; flex-wrap: wrap; gap: 0.5rem; }
         .tag { background-color: var(--color-granite-light); padding: 0.25rem 0.75rem; border-radius: 12px; font-size: 0.8rem; }
-        
-        /* Subtask Styling */
-        .subtask-list { list-style: none; display: flex; flex-direction: column; gap: 0.75rem; }
-        .subtask-item { display: flex; align-items: center; gap: 0.75rem; font-size: 0.9rem; }
-        .subtask-item input[type="checkbox"] { width: auto; }
-        .subtask-item label { color: var(--color-text-secondary); }
-        .subtask-item.completed label { text-decoration: line-through; color: var(--color-text-tertiary); }
-        .subtask-progress { margin-top: 1rem; }
-        .subtask-progress .detail-item { font-size: 0.8rem; color: var(--color-text-tertiary); }
-
+        .subtask-list { list-style: none; display: flex; flex-direction: column; gap: 0.5rem; }
         .task-actions { border-top: 1px solid var(--glass-border); padding-top: 1rem; display: flex; gap: 0.75rem; justify-content: flex-end; }
         .task-actions button { background: var(--color-granite-slate); border: 1px solid var(--color-granite-medium); color: var(--color-text-secondary); padding: 0.5rem 1rem; border-radius: 6px; cursor: pointer; transition: all 0.2s ease; }
         .task-actions button:hover { background: var(--color-granite-medium); color: var(--color-text-primary); }
@@ -234,15 +224,15 @@
                 </section>
 
                 <section class="card">
-                    <h2>Goals</h2>
+                    <h2>Weekly Goals</h2>
                     <div id="goalPanel">
-                        <div class="goal-item">Daily Goals: <span id="taskGoalProgressText">0 / 5</span></div>
+                        <div class="goal-item">Task Goal: <span id="taskGoalProgressText">0 / 10</span></div>
                         <div class="progress-bar"><div id="taskGoalProgressBar" class="progress-bar-inner"></div></div>
-                        <div class="goal-item" style="margin-top: 1rem;">Weekly Goals: <span id="timeGoalProgressText">0h / 20h</span></div>
+                        <div class="goal-item" style="margin-top: 1rem;">Time Goal: <span id="timeGoalProgressText">0h / 20h</span></div>
                         <div class="progress-bar"><div id="timeGoalProgressBar" class="progress-bar-inner"></div></div>
                         <div class="goal-inputs">
-                            <input type="number" id="dailyTaskGoal" placeholder="Daily Task Goal">
-                            <input type="number" id="weeklyTimeGoal" placeholder="Weekly Hours Goal">
+                            <input type="number" id="weeklyTaskGoal" placeholder="Task Goal">
+                            <input type="number" id="weeklyTimeGoal" placeholder="Hours Goal">
                         </div>
                     </div>
                 </section>
@@ -287,10 +277,6 @@
                         <label for="taskDesc">Description (Markdown Supported)</label>
                         <textarea id="taskDesc" placeholder="*Key objective*..."></textarea>
                     </div>
-                     <div class="form-group full-width">
-                        <label for="taskSubtasks">Subtasks (one per line)</label>
-                        <textarea id="taskSubtasks" placeholder="- Research competitors&#10;- Draft outline&#10;- Final review"></textarea>
-                    </div>
                     <div class="form-group">
                         <label for="taskDueDate">Due Date</label>
                         <input type="date" id="taskDueDate">
@@ -325,26 +311,12 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', () => {
-    // --- SUPABASE SETUP ---
-    // IMPORTANT: Replace with your actual Supabase URL and Anon Key
-    const SUPABASE_URL = 'https://jmaqxxgyvvbvkcdlffss.supabase.co'; 
-    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImptYXF4eGd5dnZidmtjZGxmZnNzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTAyNjQzMzYsImV4cCI6MjA2NTg0MDMzNn0.LDkC6T6_oekOwS9cakKYFAes0PFKBht5LEaKCdX6vE0';
-
-    if (!SUPABASE_URL || SUPABASE_URL === 'YOUR_SUPABASE_URL' || !SUPABASE_ANON_KEY || SUPABASE_ANON_KEY === 'YOUR_SUPABASE_ANON_KEY') {
-        console.warn("Supabase credentials are not set. The app will not function correctly. Please follow the setup instructions.");
-        alert("Supabase credentials are not set. Please update the script in nush.html with your project's URL and Anon Key.");
-        return;
-    }
-    
-    const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-
     // --- BASIC SETUP & DATA ---
     const quotes = [ { text: "The secret of getting ahead is getting started.", author: "Mark Twain" }, { text: "Focus on being productive instead of busy.", author: "Tim Ferriss" }, { text: "The key is not to prioritize what's on your schedule, but to schedule your priorities.", author: "Stephen Covey" } ];
     const nycImages = [ 'https://images.unsplash.com/photo-1496442226666-8d4d0e62e6e9?q=80&w=2670&auto=format&fit=crop', 'https://images.unsplash.com/photo-1542338106-9d236d2d7c86?q=80&w=2574&auto=format&fit=crop', 'https://images.unsplash.com/photo-1519121785383-3229633bb75b?q=80&w=2656&auto=format&fit=crop' ];
 
-    let tasks = [];
-    let goals = { tasks: 5, hours: 20 };
+    let tasks = JSON.parse(localStorage.getItem('tasks')) || [];
+    let goals = JSON.parse(localStorage.getItem('goals')) || { tasks: 10, hours: 20 };
 
     // DOM Elements
     const taskForm = document.getElementById('taskForm');
@@ -353,7 +325,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const allFilters = ['searchInput', 'statusFilter', 'urgencyFilter', 'sortFilter', 'viewToggle'];
     allFilters.forEach(id => document.getElementById(id).addEventListener('change', renderAll));
     document.getElementById('searchInput').addEventListener('input', renderAll);
-    const dailyTaskGoalInput = document.getElementById('dailyTaskGoal');
+    const weeklyTaskGoalInput = document.getElementById('weeklyTaskGoal');
     const weeklyTimeGoalInput = document.getElementById('weeklyTimeGoal');
     
     // Modal Elements
@@ -363,7 +335,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
     // --- INITIALIZATION ---
-    async function init() {
+    function init() {
         setDailyContent();
         changeBackground();
         setInterval(changeBackground, 20000);
@@ -372,7 +344,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         taskForm.addEventListener('submit', addTask);
         taskList.addEventListener('click', handleTaskAction);
-        dailyTaskGoalInput.addEventListener('change', setGoals);
+        weeklyTaskGoalInput.addEventListener('change', setGoals);
         weeklyTimeGoalInput.addEventListener('change', setGoals);
         
         // Modal Event Listeners
@@ -384,41 +356,8 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
         
-        await fetchAllData();
         renderAll();
     }
-    
-    // --- DATA FETCHING ---
-    async function fetchAllData() {
-        // Fetch tasks and subtasks together
-        const { data: taskData, error: taskError } = await supabase
-            .from('tasks')
-            .select(`
-                *,
-                subtasks (*)
-            `);
-
-        if (taskError) {
-            console.error('Error fetching tasks:', taskError);
-        } else {
-            tasks = taskData || [];
-        }
-
-        // Fetch goals
-        const { data: goalData, error: goalError } = await supabase
-            .from('user_goals')
-            .select('*')
-            .limit(1)
-            .single();
-
-        if (goalData) {
-            goals = { tasks: goalData.daily_task_goal, hours: goalData.weekly_hour_goal };
-        } else if (goalError && goalError.code !== 'PGRST116') { // PGRST116 = no rows found
-             console.error('Error fetching goals:', goalError);
-        }
-        // If no goals are in the DB, the default values will be used.
-    }
-
 
     // --- MAIN RENDER FUNCTION ---
     function renderAll() {
@@ -456,148 +395,84 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     // --- TASK MANAGEMENT ---
-    async function addTask(e) {
+    function addTask(e) {
         e.preventDefault();
         const taskName = document.getElementById('taskName').value;
         if (!taskName) return;
-
-        const subtaskText = document.getElementById('taskSubtasks').value;
-        const subtasks = subtaskText.split('\n').map(text => text.trim()).filter(Boolean).map(text => ({ text, completed: false }));
-
-        const taskData = {
-            name: taskName,
+        const newTask = {
+            id: Date.now(), name: taskName,
             description: document.getElementById('taskDesc').value,
-            due_date: document.getElementById('taskDueDate').value || null,
-            est_time: parseFloat(document.getElementById('taskTime').value) || 0,
+            dueDate: document.getElementById('taskDueDate').value,
+            time: parseFloat(document.getElementById('taskTime').value) || 0,
             recurrence: document.getElementById('taskRecurrence').value,
             tags: document.getElementById('taskTags').value.split(',').map(tag => tag.trim()).filter(Boolean),
             urgent: document.getElementById('taskUrgent').checked,
-            completed: false, 
-            archived: false,
-            is_working: false, 
-            work_start_time: null, 
-            actual_time_spent: 0
+            completed: false, createdAt: new Date().toISOString(), archived: false,
+            isWorking: false, workStartTime: null, actualTimeSpent: 0
         };
-
-        const { data: newTask, error } = await supabase.from('tasks').insert([taskData]).select().single();
-
-        if (error) {
-            console.error("Error adding task:", error);
-            return;
-        }
-
-        if (subtasks.length > 0) {
-            const subtasksToInsert = subtasks.map(s => ({ ...s, task_id: newTask.id }));
-            const { error: subtaskError } = await supabase.from('subtasks').insert(subtasksToInsert);
-            if (subtaskError) {
-                console.error("Error adding subtasks:", subtaskError);
-            }
-        }
-        
-        await fetchAllData();
-        renderAll();
+        tasks.push(newTask);
+        saveAndRender();
         taskForm.reset();
-        addTaskModal.style.display = 'none';
+        addTaskModal.style.display = 'none'; // Close modal on success
     }
 
-    async function handleTaskAction(e) {
+    function handleTaskAction(e) {
         const button = e.target.closest('button');
-        const subtaskCheckbox = e.target.closest('.subtask-checkbox');
-
-        if (!button && !subtaskCheckbox) return;
-
-        const taskElement = e.target.closest('.task-item');
+        if (!button) return;
+        const taskElement = button.closest('.task-item');
         const taskId = Number(taskElement.dataset.id);
-
-        if (button) {
-            if (button.classList.contains('complete-btn')) await toggleComplete(taskId);
-            else if (button.classList.contains('archive-btn')) await archiveTask(taskId);
-            else if (button.classList.contains('work-toggle-btn')) await toggleWork(taskId);
-        }
-
-        if (subtaskCheckbox) {
-            const subtaskId = Number(subtaskCheckbox.dataset.subtaskId);
-            const isChecked = subtaskCheckbox.checked;
-            await toggleSubtask(taskId, subtaskId, isChecked);
-        }
+        if (button.classList.contains('complete-btn')) toggleComplete(taskId);
+        else if (button.classList.contains('archive-btn')) archiveTask(taskId);
+        else if (button.classList.contains('work-toggle-btn')) toggleWork(taskId);
     }
     
-    async function toggleComplete(id) {
+    function toggleComplete(id) {
         const task = tasks.find(t => t.id === id);
         if (task) {
-            const newStatus = !task.completed;
-            const { error } = await supabase.from('tasks').update({ completed: newStatus }).eq('id', id);
-            if (error) console.error("Error updating task:", error);
-
-            if(newStatus && task.recurrence !== 'none' && task.due_date) {
-                await createRecurringTask(task);
+            task.completed = !task.completed;
+            if(task.completed && task.recurrence !== 'none' && task.dueDate) {
+                createRecurringTask(task);
             }
-            
-            await fetchAllData();
-            renderAll();
+            saveAndRender();
         }
     }
     
-    async function createRecurringTask(originalTask) {
-        const newDueDate = new Date(originalTask.due_date);
-        newDueDate.setUTCHours(12);
+    function createRecurringTask(originalTask) {
+        const newDueDate = new Date(originalTask.dueDate);
+        newDueDate.setUTCHours(12); // Avoid timezone issues
 
         if(originalTask.recurrence === 'daily') newDueDate.setDate(newDueDate.getDate() + 1);
         else if(originalTask.recurrence === 'weekly') newDueDate.setDate(newDueDate.getDate() + 7);
         else if(originalTask.recurrence === 'monthly') newDueDate.setMonth(newDueDate.getMonth() + 1);
 
-        const newTaskData = { ...originalTask, completed: false, created_at: new Date().toISOString(), due_date: newDueDate.toISOString().split('T')[0] };
-        delete newTaskData.id;
-        delete newTaskData.subtasks; // Don't copy subtasks to the new recurring task
-
-        const { error } = await supabase.from('tasks').insert([newTaskData]);
-        if (error) console.error("Error creating recurring task:", error);
+        const newTask = {...originalTask, id: Date.now(), completed: false, createdAt: new Date().toISOString(), dueDate: newDueDate.toISOString().split('T')[0]};
+        tasks.push(newTask);
     }
 
-    async function archiveTask(id) {
-        const { error } = await supabase.from('tasks').update({ archived: true }).eq('id', id);
-        if (error) console.error("Error archiving task:", error);
-        await fetchAllData();
-        renderAll();
-    }
-    
-    async function toggleSubtask(taskId, subtaskId, isCompleted) {
-        const { error } = await supabase.from('subtasks').update({ completed: isCompleted }).eq('id', subtaskId);
-        if (error) {
-            console.error("Error updating subtask:", error);
-        } else {
-            // Update local state for instant UI feedback before refetch
-            const task = tasks.find(t => t.id === taskId);
-            const subtask = task.subtasks.find(s => s.id === subtaskId);
-            subtask.completed = isCompleted;
-            renderAll(); // Re-render to update progress bar etc.
-        }
+    function archiveTask(id) {
+        const task = tasks.find(t => t.id === id);
+        if(task) { task.archived = true; saveAndRender(); }
     }
 
-
-    async function toggleWork(id) {
+    function toggleWork(id) {
         const task = tasks.find(t => t.id === id);
         if (task) {
-            let updates;
-            if (task.is_working) { // Stop working
-                const elapsed = (Date.now() - new Date(task.work_start_time).getTime()) / (1000 * 60 * 60); // in hours
-                updates = {
-                    actual_time_spent: task.actual_time_spent + elapsed,
-                    is_working: false,
-                    work_start_time: null
-                };
+            if (task.isWorking) { // Stop working
+                const elapsed = (Date.now() - task.workStartTime) / (1000 * 60 * 60); // in hours
+                task.actualTimeSpent += elapsed;
+                task.isWorking = false;
+                task.workStartTime = null;
             } else { // Start working
-                updates = {
-                    is_working: true,
-                    work_start_time: new Date().toISOString()
-                };
+                task.isWorking = true;
+                task.workStartTime = Date.now();
             }
-            const { error } = await supabase.from('tasks').update(updates).eq('id', id);
-            if(error) console.error("Error toggling work:", error);
-            
-            await fetchAllData();
-            renderAll();
+            saveAndRender();
         }
+    }
+
+    function saveAndRender() {
+        localStorage.setItem('tasks', JSON.stringify(tasks));
+        renderAll();
     }
 
     // --- RENDERING VIEWS ---
@@ -621,10 +496,10 @@ document.addEventListener('DOMContentLoaded', () => {
         
         filteredTasks.sort((a, b) => {
             if (filters.sort === 'due-date-asc') {
-                if (!a.due_date) return 1; if (!b.due_date) return -1;
-                return new Date(a.due_date) - new Date(b.due_date);
+                if (!a.dueDate) return 1; if (!b.dueDate) return -1;
+                return new Date(a.dueDate) - new Date(b.dueDate);
             }
-            return new Date(b.created_at) - new Date(a.created_at);
+            return new Date(b.createdAt) - new Date(a.createdAt);
         });
 
         taskList.innerHTML = '';
@@ -636,52 +511,26 @@ document.addEventListener('DOMContentLoaded', () => {
         filteredTasks.forEach(task => {
             const taskElement = document.createElement('div');
             taskElement.className = 'task-item-wrapper';
-            const isOverdue = !task.completed && task.due_date && new Date(task.due_date) < new Date();
-            const formattedDate = task.due_date ? new Date(task.due_date).toLocaleDateString(undefined, { timeZone: 'UTC', month: 'long', day: 'numeric' }) : 'No due date';
+            const isOverdue = !task.completed && task.dueDate && new Date(task.dueDate) < new Date();
+            const formattedDate = task.dueDate ? new Date(task.dueDate).toLocaleDateString(undefined, { timeZone: 'UTC', month: 'long', day: 'numeric' }) : 'No due date';
             const descriptionHtml = task.description ? marked.parse(task.description) : '';
             
-            // Subtask rendering logic
-            let subtasksHtml = '';
-            if (task.subtasks && task.subtasks.length > 0) {
-                const completedCount = task.subtasks.filter(s => s.completed).length;
-                const totalCount = task.subtasks.length;
-                const progress = totalCount > 0 ? (completedCount / totalCount) * 100 : 0;
-
-                const subtaskListHtml = task.subtasks.map(s => `
-                    <li class="subtask-item ${s.completed ? 'completed' : ''}">
-                        <input type="checkbox" class="subtask-checkbox" data-subtask-id="${s.id}" ${s.completed ? 'checked' : ''}>
-                        <label>${s.text}</label>
-                    </li>
-                `).join('');
-
-                subtasksHtml = `
-                    <div class="task-subtasks">
-                        <ul class="subtask-list">${subtaskListHtml}</ul>
-                        <div class="subtask-progress">
-                             <div class="detail-item">${completedCount} of ${totalCount} completed (${Math.round(progress)}%)</div>
-                             <div class="progress-bar" style="margin-top: 0.5rem;"><div class="progress-bar-inner" style="width: ${progress}%;"></div></div>
-                        </div>
-                    </div>
-                `;
-            }
-
             taskElement.innerHTML = `
                 <div class="card task-item ${task.completed ? 'completed' : ''}" data-id="${task.id}">
                     ${task.urgent ? '<div class="urgent-indicator"></div>' : ''}
                     <div class="task-header"><h3>${task.name}</h3><span class="task-date ${isOverdue ? 'overdue' : ''}">${formattedDate}</span></div>
                     ${descriptionHtml ? `<div class="task-description">${descriptionHtml}</div>` : ''}
-                    ${subtasksHtml}
                     <div class="task-details">
                         <div class="task-details-grid">
-                            ${task.est_time ? `<div class="detail-item"><strong>Est:</strong> ${task.est_time}h</div>` : ''}
-                            ${task.tags && task.tags.length > 0 ? `<div class="detail-item tags-container">${task.tags.map(tag => `<span class="tag">${tag}</span>`).join('')}</div>` : ''}
+                            ${task.time ? `<div class="detail-item"><strong>Est:</strong> ${task.time}h</div>` : ''}
+                            ${task.tags.length > 0 ? `<div class="detail-item tags-container">${task.tags.map(tag => `<span class="tag">${tag}</span>`).join('')}</div>` : ''}
                         </div>
                     </div>
                      <div class="task-tracking">
-                        <div class="detail-item"><strong>Time Tracked:</strong> ${task.actual_time_spent.toFixed(2)}h</div>
+                        <div class="detail-item"><strong>Time Tracked:</strong> ${task.actualTimeSpent.toFixed(2)}h</div>
                     </div>
                     <div class="task-actions">
-                        <button class="work-toggle-btn ${task.is_working ? 'working' : ''}">${task.is_working ? '⏸ Stop Work' : '▶ Start Work'}</button>
+                        <button class="work-toggle-btn ${task.isWorking ? 'working' : ''}">${task.isWorking ? '⏸ Stop Work' : '▶ Start Work'}</button>
                         <button class="complete-btn">${task.completed ? 'Mark Incomplete' : 'Complete'}</button>
                         <button class="archive-btn">Archive</button>
                     </div>
@@ -697,10 +546,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         const calendarEl = document.getElementById('calendar-view');
         const events = tasks
-            .filter(task => task.due_date && !task.archived)
+            .filter(task => task.dueDate && !task.archived)
             .map(task => ({
                 title: task.name,
-                start: task.due_date,
+                start: task.dueDate,
                 allDay: true,
                 extendedProps: { taskId: task.id },
                 className: task.urgent ? 'urgent' : ''
@@ -733,10 +582,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const week = getWeekRange();
         const nonArchivedTasks = tasks.filter(t => !t.archived);
 
-        const createdToday = nonArchivedTasks.filter(t => t.created_at.slice(0, 10) === today).length;
-        const completedWeek = nonArchivedTasks.filter(t => t.completed && new Date(t.created_at) >= week.start && new Date(t.created_at) <= week.end).length;
-        const overdue = nonArchivedTasks.filter(t => !t.completed && t.due_date && new Date(t.due_date) < new Date()).length;
-        const timeWorkedWeek = nonArchivedTasks.reduce((acc, t) => acc + (t.actual_time_spent || 0), 0);
+        const createdToday = nonArchivedTasks.filter(t => t.createdAt.slice(0, 10) === today).length;
+        const completedWeek = nonArchivedTasks.filter(t => t.completed && new Date(t.createdAt) >= week.start && new Date(t.createdAt) <= week.end).length;
+        const overdue = nonArchivedTasks.filter(t => !t.completed && t.dueDate && new Date(t.dueDate) < new Date()).length;
+        const timeWorkedWeek = nonArchivedTasks.reduce((acc, t) => acc + (t.actualTimeSpent || 0), 0);
 
         document.getElementById('tasksCreatedToday').textContent = createdToday;
         document.getElementById('tasksCompletedWeek').textContent = completedWeek;
@@ -744,46 +593,27 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('totalTimeWorkedWeek').textContent = `${timeWorkedWeek.toFixed(2)}h`;
     }
 
-    async function setGoals() {
-        const newDailyGoal = parseInt(dailyTaskGoalInput.value);
-        const newWeeklyGoal = parseInt(weeklyTimeGoalInput.value);
-        
-        let updates = {};
-        if (!isNaN(newDailyGoal)) updates.daily_task_goal = newDailyGoal;
-        if (!isNaN(newWeeklyGoal)) updates.weekly_hour_goal = newWeeklyGoal;
-
-        if (Object.keys(updates).length > 0) {
-            // Upsert operation: update if exists, insert if not.
-            const { error } = await supabase.from('user_goals').upsert({ id: 1, ...updates });
-             if(error) console.error("Error setting goals: ", error);
-        }
-       
-        dailyTaskGoalInput.value = '';
+    function setGoals() {
+        goals.tasks = parseInt(weeklyTaskGoalInput.value) || goals.tasks;
+        goals.hours = parseInt(weeklyTimeGoalInput.value) || goals.hours;
+        localStorage.setItem('goals', JSON.stringify(goals));
+        weeklyTaskGoalInput.value = '';
         weeklyTimeGoalInput.value = '';
-        await fetchAllData();
         renderGoals();
     }
 
     function renderGoals() {
-        const today = new Date();
-        today.setHours(0,0,0,0);
         const week = getWeekRange();
-        
         const nonArchivedTasks = tasks.filter(t => !t.archived);
-        const tasksCompletedToday = nonArchivedTasks.filter(t => t.completed && new Date(t.created_at) >= today).length;
-        const hoursWorkedThisWeek = nonArchivedTasks.reduce((acc, t) => {
-            if (new Date(t.created_at) >= week.start && new Date(t.created_at) <= week.end) {
-                return acc + (t.actual_time_spent || 0);
-            }
-            return acc;
-        }, 0);
+        const tasksCompleted = nonArchivedTasks.filter(t => t.completed && new Date(t.createdAt) >= week.start && new Date(t.createdAt) <= week.end).length;
+        const hoursWorked = nonArchivedTasks.reduce((acc, t) => acc + (t.actualTimeSpent || 0), 0);
 
-        const taskProgress = Math.min((tasksCompletedToday / goals.tasks) * 100, 100);
-        const timeProgress = Math.min((hoursWorkedThisWeek / goals.hours) * 100, 100);
+        const taskProgress = Math.min((tasksCompleted / goals.tasks) * 100, 100);
+        const timeProgress = Math.min((hoursWorked / goals.hours) * 100, 100);
         
-        document.getElementById('taskGoalProgressText').textContent = `${tasksCompletedToday} / ${goals.tasks}`;
+        document.getElementById('taskGoalProgressText').textContent = `${tasksCompleted} / ${goals.tasks}`;
         document.getElementById('taskGoalProgressBar').style.width = `${taskProgress}%`;
-        document.getElementById('timeGoalProgressText').textContent = `${hoursWorkedThisWeek.toFixed(2)}h / ${goals.hours}h`;
+        document.getElementById('timeGoalProgressText').textContent = `${hoursWorked.toFixed(2)}h / ${goals.hours}h`;
         document.getElementById('timeGoalProgressBar').style.width = `${timeProgress}%`;
     }
     
@@ -792,10 +622,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const chartContainer = document.getElementById('chartContainer');
         if (!chartContainer) return;
         
-        const tagData = tasks.filter(t => !t.archived && t.tags && t.tags.length > 0 && t.est_time > 0)
+        const tagData = tasks.filter(t => !t.archived && t.tags.length > 0 && t.time > 0)
             .reduce((acc, task) => {
                 task.tags.forEach(tag => {
-                    acc[tag] = (acc[tag] || 0) + task.est_time;
+                    acc[tag] = (acc[tag] || 0) + task.time;
                 });
                 return acc;
             }, {});
@@ -836,8 +666,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function checkDueDates() {
         const now = new Date();
-        tasks.filter(t => !t.completed && !t.archived && t.due_date).forEach(task => {
-            const dueDate = new Date(task.due_date);
+        tasks.filter(t => !t.completed && !t.archived && t.dueDate).forEach(task => {
+            const dueDate = new Date(task.dueDate);
             const timeDiff = dueDate.getTime() - now.getTime();
             const oneDay = 24 * 60 * 60 * 1000;
             if (timeDiff > 0 && timeDiff < oneDay) {
