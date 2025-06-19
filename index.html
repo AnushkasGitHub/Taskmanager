@@ -10,7 +10,9 @@
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js'></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
+        /* [YOUR EXISTING CSS STYLES GO HERE... No changes needed in CSS] */
         :root {
             --color-granite-black: #0a0a0b;
             --color-granite-charcoal: #1c1c1e;
@@ -311,20 +313,28 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', () => {
+    // --- SUPABASE SETUP ---
+    const SUPABASE_URL = 'https://wsgmudrebqduzljsemeh.supabase.co'; // <-- Paste your URL here
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndzZ211ZHJlYnFkdXpsanNlbWVoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTAzMzc1ODgsImV4cCI6MjA2NTkxMzU4OH0.HYItrG0MlRV-7pgl2bmbom7TbmrsL6dqcHduyQm0K8I'; // <-- Paste your anon key here
+
+    const { createClient } = supabase;
+    const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
     // --- BASIC SETUP & DATA ---
     const quotes = [ { text: "The secret of getting ahead is getting started.", author: "Mark Twain" }, { text: "Focus on being productive instead of busy.", author: "Tim Ferriss" }, { text: "The key is not to prioritize what's on your schedule, but to schedule your priorities.", author: "Stephen Covey" } ];
     const nycImages = [ 'https://images.unsplash.com/photo-1496442226666-8d4d0e62e6e9?q=80&w=2670&auto=format&fit=crop', 'https://images.unsplash.com/photo-1542338106-9d236d2d7c86?q=80&w=2574&auto=format&fit=crop', 'https://images.unsplash.com/photo-1519121785383-3229633bb75b?q=80&w=2656&auto=format&fit=crop' ];
-
-    let tasks = JSON.parse(localStorage.getItem('tasks')) || [];
-    let goals = JSON.parse(localStorage.getItem('goals')) || { tasks: 10, hours: 20 };
+    
+    // --- State is now fetched from Supabase ---
+    let tasks = [];
+    let goals = { tasks: 10, hours: 20 }; // Can be extended to be stored in Supabase too
 
     // DOM Elements
     const taskForm = document.getElementById('taskForm');
     const taskList = document.getElementById('taskList');
     const calendarView = document.getElementById('calendar-view');
     const allFilters = ['searchInput', 'statusFilter', 'urgencyFilter', 'sortFilter', 'viewToggle'];
-    allFilters.forEach(id => document.getElementById(id).addEventListener('change', renderAll));
-    document.getElementById('searchInput').addEventListener('input', renderAll);
+    allFilters.forEach(id => document.getElementById(id)?.addEventListener('change', renderAll));
+    document.getElementById('searchInput')?.addEventListener('input', renderAll);
     const weeklyTaskGoalInput = document.getElementById('weeklyTaskGoal');
     const weeklyTimeGoalInput = document.getElementById('weeklyTimeGoal');
     
@@ -335,31 +345,53 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
     // --- INITIALIZATION ---
-    function init() {
+    async function init() {
         setDailyContent();
         changeBackground();
         setInterval(changeBackground, 20000);
-        Notification.requestPermission();
-        setInterval(checkDueDates, 60 * 60 * 1000); // Check every hour
-
+        
         taskForm.addEventListener('submit', addTask);
         taskList.addEventListener('click', handleTaskAction);
-        weeklyTaskGoalInput.addEventListener('change', setGoals);
-        weeklyTimeGoalInput.addEventListener('change', setGoals);
         
         // Modal Event Listeners
         showModalBtn.addEventListener('click', () => addTaskModal.style.display = 'block');
         closeModalBtn.addEventListener('click', () => addTaskModal.style.display = 'none');
         window.addEventListener('click', (e) => {
-            if (e.target === addTaskModal) {
-                addTaskModal.style.display = 'none';
-            }
+            if (e.target === addTaskModal) addTaskModal.style.display = 'none';
         });
         
+        await fetchAndRender();
+    }
+    
+    // --- Fetch data from Supabase and render all components ---
+    async function fetchAndRender() {
+        await fetchTasks();
         renderAll();
     }
 
-    // --- MAIN RENDER FUNCTION ---
+    // --- Fetch tasks from the database ---
+    async function fetchTasks() {
+        const { data, error } = await db
+            .from('tasks')
+            .select('*')
+            .order('created_at', { ascending: false });
+
+        if (error) {
+            console.error('Error fetching tasks:', error);
+            return;
+        }
+        // Map snake_case from DB to camelCase for JS code consistency
+        tasks = data.map(t => ({
+            id: t.id, name: t.name, description: t.description,
+            dueDate: t.due_date, time: t.time_est, recurrence: t.recurrence,
+            tags: t.tags || [], urgent: t.urgent, completed: t.completed,
+            createdAt: t.created_at, archived: t.archived, isWorking: t.is_working,
+            workStartTime: t.work_start_time, actualTimeSpent: t.actual_time_spent
+        }));
+    }
+
+
+    // --- MAIN RENDER FUNCTION (no major changes) ---
     function renderAll() {
         const view = document.getElementById('viewToggle').value;
         if (view === 'list' || view === 'archived') {
@@ -378,7 +410,7 @@ document.addEventListener('DOMContentLoaded', () => {
         renderAnalytics();
     }
 
-    // --- UI & CONTENT FUNCTIONS ---
+    // --- UI & CONTENT FUNCTIONS (no changes) ---
     function setDailyContent() {
         const today = new Date();
         const dayOfYear = Math.floor((today - new Date(today.getFullYear(), 0, 0)) / 1000 / 60 / 60 / 24);
@@ -394,85 +426,101 @@ document.addEventListener('DOMContentLoaded', () => {
         document.body.style.backgroundImage = `url('${nycImages[currentImageIndex]}')`;
     }
     
-    // --- TASK MANAGEMENT ---
-    function addTask(e) {
+    // --- TASK MANAGEMENT (CHANGED TO ASYNC DB CALLS) ---
+    async function addTask(e) {
         e.preventDefault();
         const taskName = document.getElementById('taskName').value;
+        const dueDateValue = document.getElementById('taskDueDate').value;
         if (!taskName) return;
+
         const newTask = {
-            id: Date.now(), name: taskName,
+            name: taskName,
             description: document.getElementById('taskDesc').value,
-            dueDate: document.getElementById('taskDueDate').value,
-            time: parseFloat(document.getElementById('taskTime').value) || 0,
+            due_date: dueDateValue ? dueDateValue : null,
+            time_est: parseFloat(document.getElementById('taskTime').value) || 0,
             recurrence: document.getElementById('taskRecurrence').value,
             tags: document.getElementById('taskTags').value.split(',').map(tag => tag.trim()).filter(Boolean),
             urgent: document.getElementById('taskUrgent').checked,
-            completed: false, createdAt: new Date().toISOString(), archived: false,
-            isWorking: false, workStartTime: null, actualTimeSpent: 0
         };
-        tasks.push(newTask);
-        saveAndRender();
-        taskForm.reset();
-        addTaskModal.style.display = 'none'; // Close modal on success
+
+        const { error } = await db.from('tasks').insert([newTask]);
+        if (error) {
+            console.error("Error adding task:", error);
+        } else {
+            await fetchAndRender();
+            taskForm.reset();
+            addTaskModal.style.display = 'none';
+        }
     }
 
-    function handleTaskAction(e) {
+    async function handleTaskAction(e) {
         const button = e.target.closest('button');
         if (!button) return;
         const taskElement = button.closest('.task-item');
         const taskId = Number(taskElement.dataset.id);
-        if (button.classList.contains('complete-btn')) toggleComplete(taskId);
-        else if (button.classList.contains('archive-btn')) archiveTask(taskId);
-        else if (button.classList.contains('work-toggle-btn')) toggleWork(taskId);
+
+        if (button.classList.contains('complete-btn')) await toggleComplete(taskId);
+        else if (button.classList.contains('archive-btn')) await archiveTask(taskId);
+        else if (button.classList.contains('work-toggle-btn')) await toggleWork(taskId);
     }
     
-    function toggleComplete(id) {
+    async function toggleComplete(id) {
         const task = tasks.find(t => t.id === id);
         if (task) {
-            task.completed = !task.completed;
-            if(task.completed && task.recurrence !== 'none' && task.dueDate) {
-                createRecurringTask(task);
+            const newCompletedStatus = !task.completed;
+            const { error } = await db.from('tasks').update({ completed: newCompletedStatus }).eq('id', id);
+            
+            if (error) console.error('Error updating task:', error);
+            else {
+                if (newCompletedStatus && task.recurrence !== 'none' && task.dueDate) {
+                    await createRecurringTask(task);
+                }
+                await fetchAndRender();
             }
-            saveAndRender();
         }
     }
     
-    function createRecurringTask(originalTask) {
+    async function createRecurringTask(originalTask) {
         const newDueDate = new Date(originalTask.dueDate);
-        newDueDate.setUTCHours(12); // Avoid timezone issues
+        newDueDate.setUTCHours(12);
 
         if(originalTask.recurrence === 'daily') newDueDate.setDate(newDueDate.getDate() + 1);
         else if(originalTask.recurrence === 'weekly') newDueDate.setDate(newDueDate.getDate() + 7);
         else if(originalTask.recurrence === 'monthly') newDueDate.setMonth(newDueDate.getMonth() + 1);
 
-        const newTask = {...originalTask, id: Date.now(), completed: false, createdAt: new Date().toISOString(), dueDate: newDueDate.toISOString().split('T')[0]};
-        tasks.push(newTask);
+        // Create a new task object, mapping JS camelCase to DB snake_case
+        const newTask = {
+            name: originalTask.name, description: originalTask.description,
+            due_date: newDueDate.toISOString().split('T')[0],
+            time_est: originalTask.time, recurrence: originalTask.recurrence,
+            tags: originalTask.tags, urgent: originalTask.urgent
+        };
+
+        const { error } = await db.from('tasks').insert([newTask]);
+        if (error) console.error("Error creating recurring task:", error);
     }
 
-    function archiveTask(id) {
-        const task = tasks.find(t => t.id === id);
-        if(task) { task.archived = true; saveAndRender(); }
+    async function archiveTask(id) {
+        const { error } = await db.from('tasks').update({ archived: true }).eq('id', id);
+        if (error) console.error('Error archiving task:', error);
+        else await fetchAndRender();
     }
 
-    function toggleWork(id) {
+    async function toggleWork(id) {
         const task = tasks.find(t => t.id === id);
         if (task) {
+            let updatePayload;
             if (task.isWorking) { // Stop working
-                const elapsed = (Date.now() - task.workStartTime) / (1000 * 60 * 60); // in hours
-                task.actualTimeSpent += elapsed;
-                task.isWorking = false;
-                task.workStartTime = null;
+                const elapsed = (Date.now() - new Date(task.workStartTime).getTime()) / (1000 * 60 * 60); // in hours
+                const newTimeSpent = (task.actualTimeSpent || 0) + elapsed;
+                updatePayload = { is_working: false, work_start_time: null, actual_time_spent: newTimeSpent };
             } else { // Start working
-                task.isWorking = true;
-                task.workStartTime = Date.now();
+                updatePayload = { is_working: true, work_start_time: new Date().toISOString() };
             }
-            saveAndRender();
+            const { error } = await db.from('tasks').update(updatePayload).eq('id', id);
+            if (error) console.error("Error toggling work:", error);
+            else await fetchAndRender();
         }
-    }
-
-    function saveAndRender() {
-        localStorage.setItem('tasks', JSON.stringify(tasks));
-        renderAll();
     }
 
     // --- RENDERING VIEWS ---
@@ -490,7 +538,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return task.archived === isArchivedView;
         });
 
-        if (filters.search) { filteredTasks = filteredTasks.filter(t => t.name.toLowerCase().includes(filters.search) || t.description.toLowerCase().includes(filters.search)); }
+        if (filters.search) { filteredTasks = filteredTasks.filter(t => t.name.toLowerCase().includes(filters.search) || (t.description && t.description.toLowerCase().includes(filters.search))); }
         if (filters.status !== 'all') { filteredTasks = filteredTasks.filter(t => t.completed === (filters.status === 'completed')); }
         if (filters.urgency !== 'all') { filteredTasks = filteredTasks.filter(t => t.urgent === (filters.urgency === 'urgent')); }
         
@@ -527,7 +575,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         </div>
                     </div>
                      <div class="task-tracking">
-                        <div class="detail-item"><strong>Time Tracked:</strong> ${task.actualTimeSpent.toFixed(2)}h</div>
+                        <div class="detail-item"><strong>Time Tracked:</strong> ${(task.actualTimeSpent || 0).toFixed(2)}h</div>
                     </div>
                     <div class="task-actions">
                         <button class="work-toggle-btn ${task.isWorking ? 'working' : ''}">${task.isWorking ? '⏸ Stop Work' : '▶ Start Work'}</button>
@@ -560,7 +608,7 @@ document.addEventListener('DOMContentLoaded', () => {
             headerToolbar: { left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek' },
             events: events,
             eventClick: function(info) {
-                alert('Task: ' + info.event.title);
+                alert('Task: ' + info.event.title); // Could be enhanced to open the task details
             }
         });
         calendarInstance.render();
@@ -591,15 +639,6 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('tasksCompletedWeek').textContent = completedWeek;
         document.getElementById('tasksOverdue').textContent = overdue;
         document.getElementById('totalTimeWorkedWeek').textContent = `${timeWorkedWeek.toFixed(2)}h`;
-    }
-
-    function setGoals() {
-        goals.tasks = parseInt(weeklyTaskGoalInput.value) || goals.tasks;
-        goals.hours = parseInt(weeklyTimeGoalInput.value) || goals.hours;
-        localStorage.setItem('goals', JSON.stringify(goals));
-        weeklyTaskGoalInput.value = '';
-        weeklyTimeGoalInput.value = '';
-        renderGoals();
     }
 
     function renderGoals() {
@@ -654,25 +693,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     borderWidth: 2
                 }]
             },
-            options: {
-                responsive: true,
-                plugins: {
-                    legend: { display: true, position: 'bottom', labels: { color: 'var(--color-text-secondary)'} },
-                    title: { display: true, text: 'Est. Time Distribution by Tag', color: 'var(--color-text-primary)' }
-                }
-            }
-        });
-    }
-
-    function checkDueDates() {
-        const now = new Date();
-        tasks.filter(t => !t.completed && !t.archived && t.dueDate).forEach(task => {
-            const dueDate = new Date(task.dueDate);
-            const timeDiff = dueDate.getTime() - now.getTime();
-            const oneDay = 24 * 60 * 60 * 1000;
-            if (timeDiff > 0 && timeDiff < oneDay) {
-                new Notification('Task Due Soon!', { body: `Your task "${task.name}" is due within 24 hours.` });
-            }
+            options: { responsive: true, plugins: { legend: { display: true, position: 'bottom', labels: { color: 'var(--color-text-secondary)'} }, title: { display: true, text: 'Est. Time Distribution by Tag', color: 'var(--color-text-primary)' } } }
         });
     }
 
